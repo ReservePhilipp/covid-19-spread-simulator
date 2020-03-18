@@ -1,102 +1,139 @@
-import {
-  BALL_RADIUS,
-  CANVAS_SIZE,
-  DESKTOP_CANVAS_SIZE,
-  STARTING_BALLS,
-  RUN,
-  STATIC_PEOPLE_PERCENTATGE,
-  STATES,
-  HOSPITAL_CAPACITY
-} from './options.js'
+import { BALL_RADIUS, COLORS, MORTALITY_PERCENTATGE, TICKS_TO_RECOVER, RUN, SPEED, STATES, MORTALITY_PERCENTATGE_AT_HOSPITAL, HOSPITAL_CAPACITY, HOSPITAL_NEEDED_PERCENTATGE, MORTALITY_HOSPITAL_NEEDED_PERCENTATGE   } from './options.js'
+import { checkCollision, calculateChangeDirection } from './collisions.js'
 
-import {
-  replayButton,
-  deathFilter,
-  stayHomeFilter
-} from './dom.js'
+const diameter = BALL_RADIUS * 2
 
-import { Ball } from './Ball.js'
-
-import {
-  resetValues,
-  updateCount
-} from './results.js'
-
-let balls = []
-let free_hospitalbeds = HOSPITAL_CAPACITY
-const matchMedia = window.matchMedia('(min-width: 800px)')
-
-let isDesktop = matchMedia.matches
-
-export const canvas = new window.p5(sketch => {
-  const startBalls = () => {
-    let id = 0
-    balls = []
-    Object.keys(STARTING_BALLS).forEach(state => {
-      Array.from({ length: STARTING_BALLS[state] }, () => {
-        const hasMovement = RUN.filters.stayHome
-          ? sketch.random(0, 100) < STATIC_PEOPLE_PERCENTATGE || state === STATES.infected
-          : true
-		
-        balls[id] = new Ball({
-          id,
-          sketch,
-          state,
-          hasMovement,
-          x: sketch.random(BALL_RADIUS, sketch.width - BALL_RADIUS),
-          y: sketch.random(BALL_RADIUS, sketch.height - BALL_RADIUS)
-        })
-        id++
-      })
-    })
+export class Ball {
+  constructor ({ x, y, id, state, sketch, hasMovement }) {
+    this.x = x
+    this.y = y
+    this.vx = sketch.random(-1, 1) * SPEED
+    this.vy = sketch.random(-1, 1) * SPEED
+    this.sketch = sketch
+    this.id = id
+    this.state = state
+    this.timeInfected = 0
+    this.hasMovement = hasMovement
+    this.hasCollision = true
+    this.survivor = false
+    this.willneedhospital = (sketch.random(100) <= HOSPITAL_NEEDED_PERCENTATGE) ? true : false  //chance ball will need to be admitted if infected.
   }
 
-  const createCanvas = () => {
-    const { height, width } = isDesktop
-      ? DESKTOP_CANVAS_SIZE
-      : CANVAS_SIZE
-
-    sketch.createCanvas(width, height)
-  }
-
-  sketch.setup = () => {
-    createCanvas()
-    startBalls()
-
-    matchMedia.addListener(e => {
-      isDesktop = e.matches
-      createCanvas()
-      startBalls()
-      resetValues()
-    })
-
-    replayButton.onclick = () => {
-      startBalls()
-      resetValues()
-    }
-
-    deathFilter.onclick = () => {
-      RUN.filters.death = !RUN.filters.death
-      document.getElementById('death-count').classList.toggle('show', RUN.filters.death)
-      startBalls()
-      resetValues()
-    }
-
-    stayHomeFilter.onchange = () => {
-      RUN.filters.stayHome = !RUN.filters.stayHome
-      startBalls()
-      resetValues()
+  checkState () {
+    if (this.state === STATES.inhospital || this.state === STATES.needshospital || this.state === STATES.infected) {
+      if (RUN.filters.death && !this.survivor && this.timeInfected >= TICKS_TO_RECOVER / 2) {
+      
+      	if (this.state === STATES.inhospital) this.survivor = this.sketch.random(100) >=  MORTALITY_PERCENTATGE_AT_HOSPITAL
+      	if (this.state === STATES.needshospital) this.survivor = this.sketch.random(100) >=  MORTALITY_HOSPITAL_NEEDED_PERCENTATGE 
+      	if (this.state === STATES.infected) this.survivor = this.sketch.random(100) >= MORTALITY_PERCENTATGE   //higher mortalitiy if need hospital and infected
+       
+        if (!this.survivor) {
+          this.hasMovement = false
+          
+          if (this.state === STATES.needshospital) RUN.results[STATES.needshospital]--
+          if (this.state === STATES.inhospital) RUN.results[STATES.inhospital]--
+         
+          this.state = STATES.death
+          RUN.results[STATES.infected]--
+          RUN.results[STATES.death]++
+          return
+        }
+       
+      }
+     
+      if (this.timeInfected >= TICKS_TO_RECOVER) {
+        if (this.state === STATES.inhospital) RUN.results[STATES.inhospital]--
+        if (this.state === STATES.needshospital) RUN.results[STATES.needshospital]--
+        this.state = STATES.recovered
+        RUN.results[STATES.infected]--
+        RUN.results[STATES.recovered]++
+      } else {
+        this.timeInfected++
+      }
     }
   }
 
-  sketch.draw = () => {
-    sketch.background('white')
-    balls.forEach(ball => {
-      ball.checkState()
-      ball.checkCollisions({ others: balls })
-      ball.move()
-      ball.render()
-    })
-    updateCount()
+  checkCollisions ({ others }) {
+    if (this.state === STATES.death || this.state === STATES.inhospital) return  //if dead or in hospital is considered non infectious
+
+    for (let i = this.id + 1; i < others.length; i++) {
+      const otherBall = others[i]
+      const { state, x, y } = otherBall
+      if (state === STATES.death || state === STATES.inhospital) continue         //if dead or in hospital is considered non infectious
+
+      const dx = x - this.x
+      const dy = y - this.y
+
+      if (checkCollision({ dx, dy, diameter: BALL_RADIUS * 2 })) {
+        const { ax, ay } = calculateChangeDirection({ dx, dy })
+
+        this.vx -= ax
+        this.vy -= ay
+        otherBall.vx = ax
+        otherBall.vy = ay
+
+        // both has same state, so nothing to do
+        if (this.state === state) return
+        // if any is recovered or inhospital, then nothing happens
+       if (this.state === STATES.recovered || state === STATES.recovered || this.state === STATES.inhospital) return
+        // then, if some is infected, then we make both infected
+        if (this.state === STATES.infected || state === STATES.infected || this.state === STATES.needshospital || state === STATES.needshospital) {
+          
+          
+          if (this.willneedhospital) {
+        	if (RUN.results[STATES.inhospital] < HOSPITAL_CAPACITY) {      
+          		RUN.results[STATES.inhospital]++     
+            	this.state = STATES.inhospital
+          	} else {
+          		RUN.results[STATES.needshospital]++     
+            	this.state = STATES.needshospital
+            }
+            this.hasMovement = false      //people that need hospital stay home
+          } else this.state = STATES.infected
+          
+           if (otherBall.willneedhospital) {
+        	if (RUN.results[STATES.inhospital] < HOSPITAL_CAPACITY) {      
+          		RUN.results[STATES.inhospital]++     
+            	otherBall.state = STATES.inhospital
+          	} else {
+          		RUN.results[STATES.needshospital]++     
+            	otherBall.state = STATES.needshospital
+            }
+            otherBall.hasMovement = false      //people that need hospital stay home
+          } else otherBall.state = STATES.infected
+          
+          RUN.results[STATES.infected]++
+          RUN.results[STATES.well]--
+        }
+      }
+    }
   }
-}, document.getElementById('canvas'))
+
+  move () {
+    if (!this.hasMovement) return
+
+    this.x += this.vx
+    this.y += this.vy
+
+    // check horizontal walls
+    if (
+      (this.x + BALL_RADIUS > this.sketch.width && this.vx > 0) ||
+      (this.x - BALL_RADIUS < 0 && this.vx < 0)) {
+      this.vx *= -1
+    }
+
+    // check vertical walls
+    if (
+      (this.y + BALL_RADIUS > this.sketch.height && this.vy > 0) ||
+      (this.y - BALL_RADIUS < 0 && this.vy < 0)) {
+      this.vy *= -1
+    }
+  }
+
+  render () {
+    const color = COLORS[this.state]
+    this.sketch.noStroke()
+    this.sketch.fill(color)
+    this.sketch.ellipse(this.x, this.y, diameter, diameter)
+  }
+}
