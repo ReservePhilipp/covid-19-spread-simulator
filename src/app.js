@@ -5,7 +5,8 @@ import {
   STARTING_BALLS,
   RUN,
   STATIC_PEOPLE_PERCENTATGE,
-  STATES
+  STATES,
+  HOSPITAL_CAPACITY
 } from './options.js'
 
 import {
@@ -22,6 +23,7 @@ import {
 } from './results.js'
 
 let balls = []
+let free_hospitalbeds = HOSPITAL_CAPACITY
 const matchMedia = window.matchMedia('(min-width: 800px)')
 
 let isDesktop = matchMedia.matches
@@ -35,12 +37,14 @@ export const canvas = new window.p5(sketch => {
         const hasMovement = RUN.filters.stayHome
           ? sketch.random(0, 100) < STATIC_PEOPLE_PERCENTATGE || state === STATES.infected
           : true
+		const isinfectious = (state === STATES.infected) ? true : false       
 
         balls[id] = new Ball({
           id,
           sketch,
           state,
           hasMovement,
+          isinfectious,
           x: sketch.random(BALL_RADIUS, sketch.width - BALL_RADIUS),
           y: sketch.random(BALL_RADIUS, sketch.height - BALL_RADIUS)
         })
