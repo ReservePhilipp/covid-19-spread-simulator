@@ -18,7 +18,7 @@
   <meta property="og:description" content="Coronavirus Spread Simulator with different strategies. Open source." />
   <meta property="og:site_name" content="midu.dev" />
 
-  <link rel="canonical" href="https://corona-virus-spread-simulator.midudev.now.sh/">
+  
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link as="script" rel="preload" href="./p5.min.js" />
@@ -153,7 +153,7 @@
     }
 
     #death-count {
-      display: none;
+      
     }
 
     #death-count.show {
@@ -182,7 +182,7 @@
           <input id="stay-home" type="checkbox">🏠 Stay At Home
         </label>
         <label aria-label="Activate Deaths provoked by virus" title="Deaths provoked by virus">
-          <input id="deaths" type="checkbox">☠️ Show deaths
+          <input id="deaths" type="checkbox" checked>☠️ Show deaths
         </label>
       </form>
 
@@ -190,6 +190,8 @@
         <div>Healthy<br /><span id="well">0</span></div>
         <div>Recovered<br /><span id="recovered">0</span></div>
         <div>Sick<br /><span id="infected">0</span></div>
+        <div>Hospitalized/Capacity<br /><span id="inhospital">0</span>/5</div>
+        <div>Needs Hospital<br /><span id="needshospital">0</span></div>
         <div id="death-count">Deaths<br /><span id="death">0</span></div>
       </div>
 
