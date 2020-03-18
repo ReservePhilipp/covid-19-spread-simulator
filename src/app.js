@@ -37,14 +37,12 @@ export const canvas = new window.p5(sketch => {
         const hasMovement = RUN.filters.stayHome
           ? sketch.random(0, 100) < STATIC_PEOPLE_PERCENTATGE || state === STATES.infected
           : true
-		const isinfectious = (state === STATES.infected) ? true : false       
-
+		
         balls[id] = new Ball({
           id,
           sketch,
           state,
           hasMovement,
-          isinfectious,
           x: sketch.random(BALL_RADIUS, sketch.width - BALL_RADIUS),
           y: sketch.random(BALL_RADIUS, sketch.height - BALL_RADIUS)
         })
