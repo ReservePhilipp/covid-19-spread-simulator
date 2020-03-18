@@ -1,10 +1,10 @@
-import { BALL_RADIUS, COLORS, MORTALITY_PERCENTATGE, TICKS_TO_RECOVER, RUN, SPEED, STATES } from './options.js'
+import { BALL_RADIUS, COLORS, MORTALITY_PERCENTATGE, TICKS_TO_RECOVER, RUN, SPEED, STATES, MORTALITY_PERCENTATGE_AT_HOSPITAL, HOSPITAL_CAPACITY, HOSPITAL_NEEDED_PERCENTATGE, MORTALITY_HOSPITAL_NEEDED_PERCENTATGE   } from './options.js'
 import { checkCollision, calculateChangeDirection } from './collisions.js'
 
 const diameter = BALL_RADIUS * 2
 
 export class Ball {
-  constructor ({ x, y, id, state, sketch, hasMovement }) {
+  constructor ({ x, y, id, state, sketch, hasMovement, isinfectious }) {
     this.x = x
     this.y = y
     this.vx = sketch.random(-1, 1) * SPEED
@@ -16,23 +16,35 @@ export class Ball {
     this.hasMovement = hasMovement
     this.hasCollision = true
     this.survivor = false
+    this.willneedhospital = (sketch.random(100) <= HOSPITAL_NEEDED_PERCENTATGE) ? true : false  //chance ball will need to be admitted if infected.
+    this.isinfectious = isinfectious
   }
 
   checkState () {
-    if (this.state === STATES.infected) {
+    if (this.isinfectious) {
       if (RUN.filters.death && !this.survivor && this.timeInfected >= TICKS_TO_RECOVER / 2) {
-        this.survivor = this.sketch.random(100) >= MORTALITY_PERCENTATGE
+      
+        this.survivor = this.willneedhospital ? (this.state === STATES.inhospital) ? this.sketch.random(100) >=  MORTALITY_PERCENTATGE_AT_HOSPITAL : this.sketch.random(100) >= MORTALITY_HOSPITAL_NEEDED_PERCENTATGE : this.sketch.random(100) >= MORTALITY_PERCENTATGE   //higher mortalitiy if need hospital and infected
         if (!this.survivor) {
           this.hasMovement = false
+          
+          if (this.state === STATES.needshospital) RUN.results[STATES.needshospital]--
+          if (this.state === STATES.inhospital) RUN.results[STATES.inhospital]--
+         
           this.state = STATES.death
+          this.isinfectious = false
           RUN.results[STATES.infected]--
           RUN.results[STATES.death]++
           return
         }
+       
       }
-
+     
       if (this.timeInfected >= TICKS_TO_RECOVER) {
+        if (this.state === STATES.inhospital) RUN.results[STATES.inhospital]--
+        if (this.state === STATES.needshospital) RUN.results[STATES.needshospital]--
         this.state = STATES.recovered
+        this.isinfectious = false
         RUN.results[STATES.infected]--
         RUN.results[STATES.recovered]++
       } else {
@@ -42,12 +54,12 @@ export class Ball {
   }
 
   checkCollisions ({ others }) {
-    if (this.state === STATES.death) return
+    if (this.state === STATES.death || this.state === STATES.inhospital) return  //if dead or in hospital is considered non infectious
 
     for (let i = this.id + 1; i < others.length; i++) {
       const otherBall = others[i]
-      const { state, x, y } = otherBall
-      if (state === STATES.death) continue
+      const { isinfectious,state, x, y } = otherBall
+      if (state === STATES.death || state === STATES.inhospital) continue         //if dead or in hospital is considered non infectious
 
       const dx = x - this.x
       const dy = y - this.y
@@ -62,11 +74,37 @@ export class Ball {
 
         // both has same state, so nothing to do
         if (this.state === state) return
-        // if any is recovered, then nothing happens
-        if (this.state === STATES.recovered || state === STATES.recovered) return
+        // if any is recovered or inhospital, then nothing happens
+       if (this.state === STATES.recovered || state === STATES.recovered || this.state === STATES.inhospital || state === STATES.inhospital) return
         // then, if some is infected, then we make both infected
-        if (this.state === STATES.infected || state === STATES.infected) {
-          this.state = otherBall.state = STATES.infected
+        if (this.isinfectious || otherBall.isinfectious) {
+          
+          this.isinfectious = otherBall.isinfectious = true
+          
+          if (this.willneedhospital) {
+        	if (RUN.results[STATES.inhospital] < HOSPITAL_CAPACITY) {      
+          		RUN.results[STATES.inhospital]++     
+            	this.state = STATES.inhospital
+            	this.isinfectious = false       //not infectiosu in hospital
+          	} else {
+          		RUN.results[STATES.needshospital]++     
+            	this.state = STATES.needshospital
+            }
+            this.hasMovement = false      //sick people dont move
+          } else this.state = STATES.infected
+          
+           if (otherBall.willneedhospital) {
+        	if (RUN.results[STATES.inhospital] < HOSPITAL_CAPACITY) {      
+          		RUN.results[STATES.inhospital]++     
+            	otherBall.state = STATES.inhospital
+            	otherBall.isinfectious = false       //not infectiosu in hospital
+          	} else {
+          		RUN.results[STATES.needshospital]++     
+            	otherBall.state = STATES.needshospital
+            }
+            otherBall.hasMovement = false      //sick people dont move
+          } else otherBall.state = STATES.infected
+          
           RUN.results[STATES.infected]++
           RUN.results[STATES.well]--
         }
