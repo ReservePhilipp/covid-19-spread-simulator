@@ -21,10 +21,13 @@ export class Ball {
   }
 
   checkState () {
-    if (this.isinfectious) {
+    if (this.state === STATES.inhospital || this.state === STATES.needshospital || this.state === STATES.infected) {
       if (RUN.filters.death && !this.survivor && this.timeInfected >= TICKS_TO_RECOVER / 2) {
       
-        this.survivor = this.willneedhospital ? (this.state === STATES.inhospital) ? this.sketch.random(100) >=  MORTALITY_PERCENTATGE_AT_HOSPITAL : this.sketch.random(100) >= MORTALITY_HOSPITAL_NEEDED_PERCENTATGE : this.sketch.random(100) >= MORTALITY_PERCENTATGE   //higher mortalitiy if need hospital and infected
+      	if (this.state === STATES.inhospital) this.survivor = this.sketch.random(100) >=  MORTALITY_PERCENTATGE_AT_HOSPITAL
+      	if (this.state === STATES.needshospital) this.survivor = this.sketch.random(100) >=  MORTALITY_HOSPITAL_NEEDED_PERCENTATGE 
+      	if (this.state === STATES.infected) this.survivor = this.sketch.random(100) >= MORTALITY_PERCENTATGE   //higher mortalitiy if need hospital and infected
+       
         if (!this.survivor) {
           this.hasMovement = false
           
