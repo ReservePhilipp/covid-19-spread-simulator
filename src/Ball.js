@@ -42,8 +42,8 @@ export class Ball {
       }
      
       if (this.timeInfected >= TICKS_TO_RECOVER) {
-        if (this.state === STATES.inhospital) RUN.results[STATES.inhospital]--
         if (this.state === STATES.needshospital) RUN.results[STATES.needshospital]--
+        if (this.state === STATES.inhospital) RUN.results[STATES.inhospital]--
         this.state = STATES.recovered
         RUN.results[STATES.infected]--
         RUN.results[STATES.recovered]++
@@ -76,9 +76,13 @@ export class Ball {
         if (this.state === state) return
         // if any is recovered or inhospital, then nothing happens
        if (this.state === STATES.recovered || state === STATES.recovered || this.state === STATES.inhospital) return
-        // then, if some is infected, then we make both infected
-        if (this.state === STATES.infected || state === STATES.infected || this.state === STATES.needshospital || state === STATES.needshospital) {
-          
+        // then, if one is uninfected and the other infected  make it infected
+        if ((this.state === STATES.well || state === STATES.well) && (this.state === STATES.infected || state === STATES.infected || this.state === STATES.needshospital || state === STATES.needshospital))
+        {
+           if (this.state === STATES.well || state === STATES.well) {
+           RUN.results[STATES.infected]++
+          RUN.results[STATES.well]--
+           }
           
           if (this.willneedhospital) {
         	if (RUN.results[STATES.inhospital] < HOSPITAL_CAPACITY) {      
@@ -101,9 +105,9 @@ export class Ball {
             }
             otherBall.hasMovement = false      //people that need hospital stay home
           } else otherBall.state = STATES.infected
+           
           
-          RUN.results[STATES.infected]++
-          RUN.results[STATES.well]--
+          
         }
       }
     }
